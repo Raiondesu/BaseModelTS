@@ -4,28 +4,36 @@ class PostModel extends BaseModel {
   constructor (root) {
     super(root)
     console.log('ROOT.form_data', root.form_data)
-    this.addContainers({
-      'user': {
-        fields: {
-          'name as full_name': 'string',
-          'pass': 'string'
-        },
-        source: root.form_data
-      },
-      'post_data': {
-        fields: {
-          'text as description': 'allow:[null].string.strip:15',
-          'is_mine if(&.isMine == true)': 'bool'
-        }
-      }
-    });
-    this.addModifiersBulk({
-      'strip': (value, param) => {
+    this
+
+    .describeContainer('flow', {
+      'additional': 'int.default:5'
+    })
+
+    .describeContainer('granded', {
+      'token': 'string.default:"qweqw23342d3x"'
+    })
+
+    .addContainer('user extends flow', {
+      'name as full_name': 'string',
+      'pass': 'string'
+    }, root.form_data)
+    
+    .addContainer('post_data extends [flow, granded]', {
+      'text as description': 'allow:[null].string.strip:15',
+      'is_mine if(&.isMine == true)': 'bool'
+    })
+
+    .addModifiersBulk({
+      strip: (value, param) => {
         return { value: value.substr(0, param) }
       },
-      'allow': (value, params) => {
+      allow: (value, params) => {
         return { break: params.indexOf(value) >= 0 }
       },
+      default: (value, param) => {
+        return { value: value || param }
+      }
     })
   }
 

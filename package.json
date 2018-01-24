@@ -1,14 +1,15 @@
 {
   "name": "basemodelts",
-  "version": "1.1.1",
+  "version": "1.4.0",
   "description": "Old BaseModel but in ts and improved",
   "main": "rolled/index.js",
+  "module": "compiled/index.js",
   "scripts": {
     "compile": "tsc src/index --outDir compiled --target ES6",
     "example": "rollup example/app.js --output.format iife --output.file example/bundle.js",
     "roll": "rollup compiled/index.js --output.format umd --output.file rolled/index.js --name BaseModel",
     "full": "npm run compile && npm run example && npm run roll",
-    "postversion": "npm run full",
+    "preversion": "npm run full",
     "patch": "npm version patch && npm publish",
     "minor": "npm version minor && npm publish",
     "major": "npm version major && npm publish"

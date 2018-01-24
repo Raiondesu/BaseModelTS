@@ -21,7 +21,7 @@ function fromDot(obj, path) {
 }
 
 class Container {
-    constructor(model, name, fields, source = null) {
+    constructor(model, name, fields, source) {
         this.data = {};
         this.fields = {};
         this.model = model;
@@ -41,16 +41,55 @@ class Container {
     }
 }
 
-const DEFAULTS = {
-    IS_JSON_RESPONSE: true,
-    QUERY_METHOD: 'GET',
-    CONTAINER_PROXY_PREFIX: '$'
-};
-class BaseModel {
+var DEFAULTS;
+(function (DEFAULTS) {
+    DEFAULTS.IS_JSON_RESPONSE = true;
+    DEFAULTS.QUERY_METHOD = 'GET';
+    DEFAULTS.CONTAINER_PROXY_PREFIX = '$';
+})(DEFAULTS || (DEFAULTS = {}));
+
+class BaseModel$1 {
     constructor(parent = null) {
         this.processors = {};
         this.modifiers = {};
+        this.described_containers = {};
         this.containers = {};
+        /**
+         * Adds new containers to the model
+         * @param containers Array of containers
+         */
+        this.addContainer = function () {
+            if (arguments.length >= 2) {
+                var full_name = arguments[0];
+                var fields = arguments[1];
+                var source = arguments[2];
+            }
+            else {
+                const base = arguments[0];
+                full_name = base.name;
+                fields = base.fields;
+                source = base.source;
+            }
+            let extended_fields = this.getExtendedFields(full_name);
+            let name = full_name;
+            if (extended_fields) {
+                fields = Object.assign({}, fields, extended_fields.extended);
+                name = extended_fields.name;
+            }
+            let new_container = new Container(this, name, fields, source);
+            this.containers[name] = new_container;
+            this.setProxy(name);
+            return this;
+        };
+        this.addContainers = containers => {
+            if (Array.isArray(containers))
+                containers.forEach(this.addContainer);
+            for (let name in containers) {
+                const { fields, source } = containers[name];
+                this.addContainer(name, fields, source);
+            }
+            return this;
+        };
         this.parent = parent;
         this.addFieldProcessorsBulk({
             'int': (value) => !value ? 0 : (parseInt(value) ? +parseInt(value) : 0),
@@ -130,25 +169,52 @@ class BaseModel {
             return undefined;
     }
     /**
-     * Adds a new container to the model
-     * @param name Container name
-     * @param fields Container fields
-     * @param source Container data source
+     * Gets the extended fields for controller.
+     * @param name The name
+     * @return The extended fields.
      */
-    addContainer(name, fields, source = null) {
-        let new_container = new Container(this, name, fields, source);
-        this.containers[name] = new_container;
-        this.setProxy(name);
-        return this;
+    getExtendedFields(name) {
+        const keyword = ' extends ';
+        let is_extends = !!~name.indexOf(keyword);
+        if (is_extends) {
+            let name_splitted = name.split(keyword).map((el) => el.replace(/\s/g, ''));
+            let extended = {};
+            // Several extends
+            if (~name_splitted[1].indexOf('[')) {
+                let extends_arr = name_splitted[1]
+                    .replace(/[\[\]]/g, '')
+                    .split(',');
+                extends_arr.forEach((el) => {
+                    if (this.described_containers[el]) {
+                        extended = Object.assign({}, extended, this.described_containers[el]);
+                    }
+                });
+            }
+            else {
+                if (this.described_containers[name_splitted[1]]) {
+                    extended = Object.assign({}, extended, this.described_containers[name_splitted[1]]);
+                }
+            }
+            return { name: name_splitted[0], extended };
+        }
+        else {
+            return false;
+        }
     }
     /**
-     * Adds new containers to the model
-     * @param containers Array of containers
+     * Describe basic container
+     *
+     * @param      {string}  full_name  The full name
+     * @param      {Object}  fields     The fields
      */
-    addContainers(containers) {
-        containers.forEach((container) => {
-            this.addContainer(container.name, container.fields, container.source);
-        });
+    describeContainer(full_name, fields = {}) {
+        let extended_fields = this.getExtendedFields(full_name);
+        let name = full_name;
+        if (extended_fields) {
+            fields = Object.assign({}, fields, extended_fields.extended);
+            name = extended_fields.name;
+        }
+        this.described_containers[name] = fields;
         return this;
     }
     /**
@@ -422,29 +488,40 @@ class BaseModel {
     }
 }
 
-class PostModel extends BaseModel {
+class PostModel extends BaseModel$1 {
   constructor (root) {
     super(root);
     console.log('ROOT.form_data', root.form_data);
     this
-      .addContainer(
-        'user', {
-          'name as full_name': 'string',
-          'pass': 'string'
-        }, root.form_data)
-      .addContainer(
-        'post_data', {
-          'text as description': 'allow:[null].string.strip:15',
-          'is_mine if(&.isMine == true)': 'bool'
-        }
-      );
-    this.addModifiersBulk({
-      'strip': (value, param) => {
+
+    .describeContainer('flow', {
+      'additional': 'int.default:5'
+    })
+
+    .describeContainer('granded', {
+      'token': 'string.default:"qweqw23342d3x"'
+    })
+
+    .addContainer('user extends flow', {
+      'name as full_name': 'string',
+      'pass': 'string'
+    }, root.form_data)
+    
+    .addContainer('post_data extends [flow, granded]', {
+      'text as description': 'allow:[null].string.strip:15',
+      'is_mine if(&.isMine == true)': 'bool'
+    })
+
+    .addModifiersBulk({
+      strip: (value, param) => {
         return { value: value.substr(0, param) }
       },
-      'allow': (value, params) => {
+      allow: (value, params) => {
         return { break: params.indexOf(value) >= 0 }
       },
+      default: (value, param) => {
+        return { value: value || param }
+      }
     });
   }
 

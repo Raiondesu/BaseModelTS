@@ -1,6 +1,6 @@
 import { BaseModel } from './BaseModel'
 
-export default class Container<T> {
+export class Container<T> {
   private model: BaseModel<T>
   public data: any = {}
   public name: string
