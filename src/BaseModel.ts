@@ -1,4 +1,4 @@
-import Container from './Container'
+import { Container } from './Container'
 import { DEFAULTS } from './defaults'
 import { fromDot, getQueryString } from './misc'
 import {
@@ -16,6 +16,7 @@ export class BaseModel<Parent> {
 
   private processors: MethodSet = {}
   private modifiers: MethodSet = {}
+  private described_containers: any = {}
 
   public parent: Parent
   public containers: ContainerSet<Parent> = {}
@@ -112,14 +113,20 @@ export class BaseModel<Parent> {
     (container: ContainerBase): BaseModel<Parent>;
   } = function() {
     if (arguments.length >= 2) {
-      var name = arguments[0]
+      var full_name = arguments[0]
       var fields = arguments[1]
       var source = arguments[2]
     } else {
       const base: ContainerBase = arguments[0];
-      name = base.name
+      full_name = base.name
       fields = base.fields
       source = base.source
+    }
+    let extended_fields: any = this.getExtendedFields(full_name)
+    let name: string = full_name
+    if (extended_fields) {
+      fields = { ...fields, ...extended_fields.extended }
+      name = extended_fields.name
     }
     let new_container = new Container(this, name, fields, source)
     this.containers[name] = new_container
@@ -137,6 +144,59 @@ export class BaseModel<Parent> {
       const { fields, source } = containers[name]
       this.addContainer(name, fields, source)
     }
+    return this
+  }
+
+  /**
+   * Gets the extended fields for controller.
+   * @param name The name
+   * @return The extended fields.
+   */
+  public getExtendedFields (name: string): (any|boolean) {
+    const keyword: string = ' extends '
+    let is_extends: boolean = !!~name.indexOf(keyword)
+    if (is_extends) {
+      let name_splitted: string[] = name.split(keyword).map((el: string) => el.replace(/\s/g, ''))
+      let extended: any = {}
+      // Several extends
+      if (~name_splitted[1].indexOf('[')) {
+        let extends_arr: string[] = name_splitted[1]
+          .replace(/[\[\]]/g, '')
+          .split(',')
+
+        extends_arr.forEach((el: string) => {
+          if (this.described_containers[el]) {
+            extended = { ...extended, ...this.described_containers[el] }
+          }
+        })
+      }
+      else {
+        if (this.described_containers[name_splitted[1]]) {
+          extended = { ...extended, ...this.described_containers[name_splitted[1]] }
+        }
+      }
+      return { name: name_splitted[0], extended }
+    } else {
+      return false
+    }
+  }
+
+  /**
+   * Describe basic container
+   *
+   * @param      {string}  full_name  The full name
+   * @param      {Object}  fields     The fields
+   */
+  describeContainer (full_name, fields = {}) {
+    let extended_fields = this.getExtendedFields(full_name)
+    let name = full_name
+
+    if (extended_fields) {
+      fields = { ...fields, ...extended_fields.extended }
+      name = extended_fields.name
+    }
+
+    this.described_containers[name] = fields
     return this
   }
 
