@@ -1,5 +1,6 @@
-import { fromDot, getQueryString } from './misc'
 import Container from './Container'
+import { DEFAULTS } from './defaults'
+import { fromDot, getQueryString } from './misc'
 import {
   Processor,
   Modifier,
@@ -9,7 +10,6 @@ import {
   QueryMethod,
   ContainerBases
 } from './interfaces'
-import { DEFAULTS } from './defaults';
 
 export class BaseModel<Parent> {
   [key: string]: any
@@ -260,14 +260,16 @@ export class BaseModel<Parent> {
     }
 
     let result: () => void = () => {
-      return new Promise((resolve, reject) => {
-        fetch(uri, {
-          headers: new Headers(Object.assign({},headers)),
-          credentials,
-          method,
-          mode,
-          body: data
-        }).then((response) => {
+      return new Promise(async (resolve, reject) => {
+        try {
+          const response = await fetch(uri, {
+            headers: new Headers(Object.assign({},headers)),
+            credentials,
+            method,
+            mode,
+            body: data
+          })
+        
           if (this.interceptor) {
             let is_continue: boolean = this.interceptor(response)
             if (!is_continue) {
@@ -278,25 +280,26 @@ export class BaseModel<Parent> {
             reject()
           }
           if (is_json) {
-            response.json().then((json: string) => {
-              resolve(json)
-            }).catch(() => {
+            try {
+              resolve(await response.json())
+            } catch(e) {
               let err: any = new Error('Json parse error')
               err.type = 'json'
               reject(err)
-            })
+            }
           } else {
-            response.text().then((text: string) => {
-              resolve(text)
-            }).catch(() => {
+            try {
+              resolve(await response.text())
+            } catch(e) {
               let err: any = new Error('Text retrieve error')
               err.type = 'text'
               reject(err)
-            })
+            }
           }
-        }).catch((error: any) => {
+        }
+        catch (error) {
           reject(error)
-        })
+        }
       })
     }
     return result
