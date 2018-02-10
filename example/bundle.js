@@ -331,13 +331,21 @@ class BaseModel$1 {
         }
         let result = () => {
             return new Promise((resolve, reject) => {
-                fetch(uri, {
+                let fetch_params = {
                     headers: new Headers(Object.assign({}, headers)),
                     credentials,
                     method,
                     mode,
                     body: data
-                }).then((response) => {
+                };
+                let before_fetch_result = {
+                    uri,
+                    fetch_params
+                };
+                if (!!(this.beforeFetch && this.beforeFetch.constructor && this.beforeFetch.call && this.beforeFetch.apply)) {
+                    before_fetch_result = this.beforeFetch(uri, fetch_params);
+                }
+                fetch(before_fetch_result.uri, before_fetch_result.fetch_params).then((response) => {
                     if (this.interceptor) {
                         let is_continue = this.interceptor(response);
                         if (!is_continue) {

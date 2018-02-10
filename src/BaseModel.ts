@@ -320,16 +320,25 @@ export class BaseModel<Parent> {
     }
 
     let result: () => void = () => {
-      return new Promise(async (resolve, reject) => {
-        try {
-          const response = await fetch(uri, {
-            headers: new Headers(Object.assign({},headers)),
-            credentials,
-            method,
-            mode,
-            body: data
-          })
-        
+      return new Promise((resolve, reject) => {
+        let fetch_params: any = {
+          headers: new Headers(Object.assign({},headers)),
+          credentials,
+          method,
+          mode,
+          body: data
+        }
+
+        let before_fetch_result: any = {
+          uri,
+          fetch_params
+        }
+
+        if (!!(this.beforeFetch && this.beforeFetch.constructor && this.beforeFetch.call && this.beforeFetch.apply)) {
+          before_fetch_result = this.beforeFetch(uri, fetch_params)
+        }
+
+        fetch(before_fetch_result.uri, before_fetch_result.fetch_params).then(async (response) => {
           if (this.interceptor) {
             let is_continue: boolean = this.interceptor(response)
             if (!is_continue) {
@@ -356,10 +365,10 @@ export class BaseModel<Parent> {
               reject(err)
             }
           }
-        }
-        catch (error) {
+        })
+        .catch((error) => {
           reject(error)
-        }
+        });
       })
     }
     return result
